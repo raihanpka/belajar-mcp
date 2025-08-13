@@ -25,9 +25,8 @@ class Chat:
                 tools=await ToolManager.get_all_tools(self.clients),
             )
 
-            # --- normalize response: support ChatCompletion (with .choices) or ChatCompletionMessage ---
+            # Normalize response: support ChatCompletion (with .choices) or ChatCompletionMessage ---
             if hasattr(raw_resp, "choices"):
-                # raw_resp is ChatCompletion
                 choice = raw_resp.choices[0]
                 finish_reason = getattr(choice, "finish_reason", None)
                 message = choice.message  # ChatCompletionMessage object
@@ -76,14 +75,11 @@ class Chat:
             if finish_reason == "tool_calls" or normalized_tool_calls:
                 print(message_content)
                 # Execute tools: ToolManager expects a dict-like message with "tool_calls"
-                tool_result_parts = ToolManager.execute_tool_requests(
+                tool_result_parts = await ToolManager.execute_tool_requests(
                     self.clients, message_dict
                 )
-
-                # Add tool results back into the conversation as user/tool messages
-                # Prefer service helper to keep parity with Claude flow
-                self.gpt_service.add_user_message(self.messages, tool_result_parts)
-                # Loop continues — next iteration will send the tool results back to the model
+                for tool_result in tool_result_parts:
+                    self.messages.append(tool_result)
             else:
                 final_text_response = message_content
                 break

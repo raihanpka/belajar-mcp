@@ -16,9 +16,12 @@ class ToolManager:
             tool_models = await client.list_tools()
             tools += [
                 {
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.inputSchema,
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.inputSchema,
+                    }
                 }
                 for t in tool_models
             ]
@@ -52,18 +55,19 @@ class ToolManager:
 
     @classmethod
     async def execute_tool_requests(
-        cls, clients: dict[str, MCPClient], message: ChatCompletionMessage
+        cls, clients: dict[str, MCPClient], message: dict
     ) -> List[ChatCompletionToolMessageParam]:
         """Executes a list of tool requests against the provided clients."""
-        tool_requests = message.tool_calls or []
+        tool_requests = message.get("tool_calls", [])
         tool_result_blocks: list[ChatCompletionToolMessageParam] = []
 
         for tool_request in tool_requests:
-            tool_use_id = tool_request.id
-            tool_name = tool_request.function.name
-
+            tool_use_id = tool_request.get("id", "")
+            tool_name = tool_request.get("function", {}).get("name", "")
+            tool_input_str = tool_request.get("function", {}).get("arguments", "{}")
+            
             try:
-                tool_input = json.loads(tool_request.function.arguments)
+                tool_input = json.loads(tool_input_str) if tool_input_str else {}
             except json.JSONDecodeError:
                 tool_result_blocks.append(
                     cls._build_tool_result_part(
